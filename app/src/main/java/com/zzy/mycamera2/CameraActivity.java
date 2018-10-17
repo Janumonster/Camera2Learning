@@ -1,6 +1,8 @@
 package com.zzy.mycamera2;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -17,6 +19,7 @@ import android.media.ImageReader;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.provider.ContactsContract;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
@@ -35,17 +38,19 @@ import android.widget.ImageView;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import pub.devrel.easypermissions.EasyPermissions;
+
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-public class CameraActivity extends AppCompatActivity implements View.OnClickListener{
+public class CameraActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = CameraActivity.class.getName();
 
     private static final SparseIntArray ORIENTATION = new SparseIntArray();
 
     static {
-        ORIENTATION.append(Surface.ROTATION_0,90);
-        ORIENTATION.append(Surface.ROTATION_90,0);
-        ORIENTATION.append(Surface.ROTATION_180,270);
-        ORIENTATION.append(Surface.ROTATION_270,180);
+        ORIENTATION.append(Surface.ROTATION_0, 90);
+        ORIENTATION.append(Surface.ROTATION_90, 0);
+        ORIENTATION.append(Surface.ROTATION_180, 270);
+        ORIENTATION.append(Surface.ROTATION_270, 180);
     }
 
     private SurfaceView mSurfaceView;
@@ -55,34 +60,15 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
     private ImageReader mImageReader;
     private CameraCaptureSession mCameraCaptureSession;
     private CameraDevice mCameraDevice;
-    private CaptureRequest.Builder mPreviewRequestBuilder;
-    private CaptureRequest.Builder captureRequestBuilder;
+    private String[] mCameraIDs;
 
-    private Handler childHandler,mainHandler;
+    private boolean isCaptured = false;
 
-    private Button btnCapture,btnRePreview;
+    private HandlerThread mBackGroundThread;
+    private Handler mHandler;
+
+    private Button btnCapture, btnRePreview;
     private ImageView imageView;
-
-    private CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
-        @Override
-        public void onOpened(@NonNull CameraDevice cameraDevice) {
-            mCameraDevice = cameraDevice;
-            takePreview();
-        }
-
-        @Override
-        public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-            if (null != mCameraDevice) {
-                mCameraDevice.close();
-                mCameraDevice = null;
-            }
-        }
-
-        @Override
-        public void onError(@NonNull CameraDevice cameraDevice, int i) {
-
-        }
-    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,163 +82,186 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
         imageView = findViewById(R.id.image);
         btnCapture = findViewById(R.id.capture);
         btnRePreview = findViewById(R.id.button2);
+        btnRePreview.setOnClickListener(this);
         btnCapture.setOnClickListener(this);
         mSurfaceView = findViewById(R.id.surfaceView);
-        mSurfaceView.setOnClickListener(this);
         mSurfaceHolder = mSurfaceView.getHolder();
         mSurfaceHolder.setKeepScreenOn(true);
-        mSurfaceHolder.addCallback(new SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(SurfaceHolder surfaceHolder) {
-                initCamera2();
-                Log.d(TAG, "initCamera2");
-            }
-
-            @Override
-            public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
-
-            }
-
-            @Override
-            public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
-                if (null != mCameraDevice){
-                    mCameraDevice.close();
-                    mCameraDevice = null;
-                }
-            }
-        });
+        initCamera();
     }
 
-    private void initCamera2() {
-        HandlerThread handlerThread = new HandlerThread("Camera2");
-        handlerThread.start();
-        childHandler = new Handler(handlerThread.getLooper());
-        mainHandler = new Handler(getMainLooper());
-        mImageReader = ImageReader.newInstance(1920,1080,ImageFormat.JPEG,1);
-        mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener(){
-            @Override
-            public void onImageAvailable(ImageReader imageReader) {
-                mCameraDevice.close();
-                mSurfaceView.setVisibility(View.GONE);
-                imageView.setVisibility(View.VISIBLE);
-
-                Image image = imageReader.acquireNextImage();
-                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                byte[] bytes = new byte[buffer.remaining()];
-                buffer.get(bytes);
-                Matrix matrix = new Matrix();
-                matrix.setRotate(90);
-                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes,0,bytes.length);
-                Bitmap bitmap1 = Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),matrix,true);
-
-                if (bitmap1 != null){
-                    imageView.setImageBitmap(bitmap1);
-                }
-
-            }
-        },mainHandler);
+    private void initCamera() {
+        mHandler = new Handler(getMainLooper());
         mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
-        if (ActivityCompat.checkSelfPermission(this,Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED){
-            return;
-        }
-        try {
-            for (String cameraId : mCameraManager.getCameraIdList()){
-                CameraCharacteristics cameraCharacteristics = mCameraManager.getCameraCharacteristics(cameraId);
-                Integer facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing != CameraCharacteristics.LENS_FACING_FRONT){
-                    mCameraID = cameraId;
-                    break;
-                }
-            }
-            mCameraManager.openCamera(mCameraID,mStateCallback,mainHandler);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void takePreview() {
-        Log.d(TAG, "takePreview");
-        try {
-            mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-            mPreviewRequestBuilder.addTarget(mSurfaceHolder.getSurface());
-            mCameraDevice.createCaptureSession(Arrays.asList(mSurfaceHolder.getSurface(), mImageReader.getSurface()), new CameraCaptureSession.StateCallback() {
-                @Override
-                public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
-                    mCameraCaptureSession = cameraCaptureSession;
-                    try {
-                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-
-                        CaptureRequest previewRequest = mPreviewRequestBuilder.build();
-                        mCameraCaptureSession.setRepeatingRequest(previewRequest, null, childHandler);
-                    } catch (CameraAccessException e) {
-                        e.printStackTrace();
+        if (mCameraManager != null) {
+            try {
+                mCameraIDs = mCameraManager.getCameraIdList();
+                for (String id : mCameraIDs) {
+                    CameraCharacteristics cameraCharacteristics = mCameraManager.getCameraCharacteristics(id);
+                    Integer facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
+                    if (facing != null && facing != CameraCharacteristics.LENS_FACING_FRONT) {
+                        mCameraID = id;
+                        break;
                     }
                 }
-                @Override
-                public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-
-                }
-            },childHandler);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
         }
     }
-
 
     @Override
     public void onClick(View view) {
         switch (view.getId()){
             case R.id.capture:
-                takeCapture();
+                takePicture();
+                isCaptured = true;
                 break;
             case R.id.button2:
-                reStartPreview();
+                imageView.setVisibility(View.GONE);
+                mSurfaceView.setVisibility(View.VISIBLE);
+                openCamera();
+                isCaptured = false;
                 break;
         }
     }
 
-    private void takeCapture() {
-        Log.d(TAG, "takeCapture");
-        if (mCameraDevice == null)return;
-        try {
-            captureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            captureRequestBuilder.addTarget(mImageReader.getSurface());
-            captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-            captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-
-            int rotation = getWindowManager().getDefaultDisplay().getRotation();
-            captureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION,ORIENTATION.get(rotation));
-
-            CaptureRequest mCaptureRequest = captureRequestBuilder.build();
-            mCameraCaptureSession.capture(mCaptureRequest,null,childHandler);
-
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void reStartPreview(){
-
-        mSurfaceView.setVisibility(View.VISIBLE);
-        imageView.setVisibility(View.GONE);
-
-        if (ActivityCompat.checkSelfPermission(this,Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED){
+    public void openCamera() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            EasyPermissions.requestPermissions(this,"权限请求",0,Manifest.permission.CAMERA);
             return;
         }
         try {
-            for (String cameraId : mCameraManager.getCameraIdList()){
-                CameraCharacteristics cameraCharacteristics = mCameraManager.getCameraCharacteristics(cameraId);
-                Integer facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing != CameraCharacteristics.LENS_FACING_FRONT){
-                    mCameraID = cameraId;
-                    break;
+            mCameraManager.openCamera(mCameraID, new CameraDevice.StateCallback() {
+                @Override
+                public void onOpened(@NonNull CameraDevice cameraDevice) {
+                    mCameraDevice = cameraDevice;
+                    startCameraPreview();
                 }
-            }
-            mCameraManager.openCamera(mCameraID,mStateCallback,mainHandler);
+
+                @Override
+                public void onDisconnected(@NonNull CameraDevice cameraDevice) {
+                    if (mCameraDevice != null){
+                        mCameraDevice.close();
+                    }
+                    mCameraDevice = null;
+                }
+
+                @Override
+                public void onError(@NonNull CameraDevice cameraDevice, int i) {
+                    if (mCameraDevice != null){
+                        mCameraDevice.close();
+                    }
+                    mCameraDevice = null;
+                }
+            }, mHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
-        takePreview();
+    }
+
+    private void closeCamera(){
+        if (mCameraDevice != null){
+            mCameraDevice.close();
+        }
+        mCameraDevice = null;
+    }
+
+
+    private void startCameraPreview(){
+        if (mCameraDevice == null){
+            return;
+        }
+        mImageReader = ImageReader.newInstance(mSurfaceView.getWidth(),mSurfaceView.getHeight(),ImageFormat.JPEG,1);
+        mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+            @Override
+            public void onImageAvailable(ImageReader imageReader) {
+                imageView.setVisibility(View.VISIBLE);
+                mSurfaceView.setVisibility(View.GONE);
+
+                Image image = imageReader.acquireNextImage();
+                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                byte[] bytes = new byte[buffer.remaining()];
+                buffer.get(bytes);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes,0,bytes.length);
+                Matrix matrix = new Matrix();
+                matrix.setRotate(90);
+                Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),matrix,true);
+                imageView.setImageBitmap(rotatedBitmap);
+            }
+        },mHandler);
+        try {
+            final CaptureRequest.Builder previewRequest = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            previewRequest.addTarget(mSurfaceHolder.getSurface());
+            previewRequest.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            mCameraDevice.createCaptureSession(Arrays.asList(mSurfaceHolder.getSurface(), mImageReader.getSurface()), new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                    mCameraCaptureSession = cameraCaptureSession;
+                    try {
+                        mCameraCaptureSession.setRepeatingRequest(previewRequest.build(),null,mHandler);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
+
+                }
+            },mHandler);
+
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void stopPreview(){
+        if (mCameraCaptureSession != null){
+            try {
+                mCameraCaptureSession.stopRepeating();
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void takePicture(){
+        if (mCameraDevice == null){
+            return;
+        }
+        try {
+            CaptureRequest.Builder pictureRequest = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            pictureRequest.addTarget(mImageReader.getSurface());
+
+            pictureRequest.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            pictureRequest.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+
+            WindowManager windowManager = (WindowManager)getSystemService(Context.WINDOW_SERVICE);
+            if (windowManager != null) {
+                int ratation = windowManager.getDefaultDisplay().getRotation();
+                pictureRequest.set(CaptureRequest.JPEG_ORIENTATION,ORIENTATION.get(ratation));
+            }
+            stopPreview();
+            mCameraCaptureSession.capture(pictureRequest.build(),null,mHandler);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!isCaptured){
+            imageView.setVisibility(View.GONE);
+            mSurfaceView.setVisibility(View.VISIBLE);
+            openCamera();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        closeCamera();
     }
 }
