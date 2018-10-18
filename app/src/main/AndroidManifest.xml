@@ -32,8 +32,8 @@
         <activity android:name=".CameraActivity" />
         <activity
             android:name=".CameraV1Activity"
-            android:screenOrientation="landscape"></activity>
-        <activity android:name=".CameraTest"></activity>
+            android:screenOrientation="landscape" />
+        <activity android:name=".CameraActivity_v2"></activity>
     </application>
 
 </manifest>

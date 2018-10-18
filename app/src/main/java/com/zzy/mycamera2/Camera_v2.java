@@ -17,9 +17,11 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
@@ -68,10 +70,15 @@ public class Camera_v2 {
 
     private Context mContext;
 
+    public void setmPreviewSurface(Surface mPreviewSurface) {
+        this.mPreviewSurface = mPreviewSurface;
+    }
+
     private Surface mPreviewSurface;
     private ImageReader mImageReader;
 
-    private Handler mMainHandler;
+    private HandlerThread mBackgroundThread;
+    private Handler mBackgroundHandler;
 
     private OnCaptureListener onCaptureListener;
 
@@ -79,29 +86,32 @@ public class Camera_v2 {
         this.onCaptureListener = onCaptureListener;
     }
 
-    public Camera_v2(Context mContext,Surface surface) {
+    public Camera_v2(Context mContext) {
         this.mContext = mContext;
-        this.mPreviewSurface = surface;
         initCamera();
     }
 
 
     private void initCamera() {
-        mMainHandler = new Handler(mContext.getMainLooper());
+        startBackgroundThread();
         mCameraManager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
         try {
-            cameraIds = mCameraManager != null ? mCameraManager.getCameraIdList() : new String[0];
-            if (cameraIds.length != 0) {
-                for (String id : cameraIds) {
-                    CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(id);
-                    Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                    if (facing != null && facing != CameraCharacteristics.LENS_FACING_FRONT) {
-                        mCameraID = id;
-                        StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                        if (map != null) {
-                            supportPreviewSize = map.getOutputSizes(SurfaceHolder.class);
+            if (mCameraManager != null) {
+                cameraIds = mCameraManager.getCameraIdList();
+                if (cameraIds.length != 0){
+                    for (String id : cameraIds){
+                        CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(id);
+                        Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                        if (facing != null && facing != CameraCharacteristics.LENS_FACING_FRONT){
+                            mCameraID = id;
+                            Log.d(TAG, "initCamera: mCameraID:"+mCameraID);
+                            mCameraCharacteristics = characteristics;
+                            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                            if (map != null) {
+                                supportPreviewSize = map.getOutputSizes(SurfaceHolder.class);
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
@@ -110,27 +120,31 @@ public class Camera_v2 {
         }
     }
 
+    private void startBackgroundThread(){
+        mBackgroundThread = new HandlerThread("cameraV2");
+        mBackgroundThread.start();
+        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+    }
 
     public void openCamera(){
+        Log.d(TAG, "openCamera");
         if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             EasyPermissions.requestPermissions((Activity) mContext,"权限请求",0,Manifest.permission.CAMERA);
             return;
         }
-
         try {
+            if (mCameraID == null){
+                Log.d(TAG, "CameraID is null!");
+                return;
+            }
             mCameraManager.openCamera(mCameraID,new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice cameraDevice) {
                     mCameraDevice = cameraDevice;
-                    startPreview();
                 }
 
                 @Override
                 public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-                    if (mCameraDevice != null){
-                        mCameraDevice.close();
-                        mCameraDevice = null;
-                    }
                 }
 
                 @Override
@@ -140,7 +154,7 @@ public class Camera_v2 {
                         mCameraDevice = null;
                     }
                 }
-            }, mMainHandler);
+            }, mBackgroundHandler);
 
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -148,6 +162,7 @@ public class Camera_v2 {
     }
 
     public void startPreview() {
+        Log.d(TAG, "startPreview");
         if (mCameraDevice == null){
             return;
         }
@@ -164,7 +179,7 @@ public class Camera_v2 {
                     onCaptureListener.onCaptured(bytes);
                     //保存图片
                 }
-            },mMainHandler);
+            }, mBackgroundHandler);
             mSurfaceList.clear();
             mSurfaceList.add(mPreviewSurface);
             mSurfaceList.add(mImageReader.getSurface());
@@ -176,9 +191,10 @@ public class Camera_v2 {
             mCameraDevice.createCaptureSession(mSurfaceList, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                    Log.d(TAG, "onConfigured: Create a new Session");
                     mCaptureSession = cameraCaptureSession;
                     try {
-                        mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),null,mMainHandler);
+                        mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),null, mBackgroundHandler);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
@@ -188,7 +204,7 @@ public class Camera_v2 {
                 public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
 
                 }
-            },mMainHandler);
+            }, mBackgroundHandler);
 
 
         } catch (CameraAccessException e) {
@@ -197,6 +213,7 @@ public class Camera_v2 {
     }
 
     public void stopPreview() {
+        Log.d(TAG, "stopPreview");
         if (mCameraDevice == null){
             return;
         }
@@ -211,6 +228,7 @@ public class Camera_v2 {
     }
 
     public void takePicture(){
+        Log.d(TAG, "takePicture");
         if (mCameraDevice == null){
             return;
         }
@@ -227,24 +245,15 @@ public class Camera_v2 {
                 int ratation = windowManager.getDefaultDisplay().getRotation();
                 pictureRequset.set(CaptureRequest.JPEG_ORIENTATION,ORIENTATION.get(ratation));
             }
-            stopPreview();
-            mCaptureSession.capture(pictureRequset.build(),null,mMainHandler);
+
+            mCaptureSession.capture(pictureRequset.build(), null, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
     }
 
     public void closeCamera(){
-        if (mCaptureSession != null){
-            try {
-                mCaptureSession.stopRepeating();
-                mCaptureSession.close();
-            } catch (CameraAccessException e) {
-                e.printStackTrace();
-            }finally {
-                mCaptureSession = null;
-            }
-        }
+        Log.d(TAG, "closeCamera");
         if (mCameraDevice != null){
             mCameraDevice.close();
             mCameraDevice = null;

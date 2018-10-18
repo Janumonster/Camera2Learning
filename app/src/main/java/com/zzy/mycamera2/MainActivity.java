@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             @Override
             public void onClick(View view) {
                 if (EasyPermissions.hasPermissions(MainActivity.this,permissions)){
-                    Intent intent = new Intent(MainActivity.this,CameraActivity.class);
+                    Intent intent = new Intent(MainActivity.this,CameraActivity_v2.class);
                     startActivity(intent);
                 }else {
                     EasyPermissions.requestPermissions(MainActivity.this,"权限请求",0,permissions);
