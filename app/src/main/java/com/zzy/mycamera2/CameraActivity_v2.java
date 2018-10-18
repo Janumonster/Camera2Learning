@@ -52,6 +52,9 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
     private SurfaceHolder.Callback callback = new SurfaceHolder.Callback() {
         @Override
         public void surfaceCreated(SurfaceHolder surfaceHolder) {
+//            if (camera_v2.isCameraClosed()){
+//                camera_v2.openCamera();
+//            }
             camera_v2.openCamera();
             camera_v2.startPreview();
         }
@@ -99,6 +102,7 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
             }
         });
         camera_v2.setmPreviewSurface(surfaceHolder.getSurface());
+
     }
 
     @Override

@@ -59,6 +59,11 @@ public class Camera_v2 {
     private Integer mCameraOrientation;
 
     private CameraManager mCameraManager;
+
+    public boolean isCameraClosed(){
+        return mCameraDevice == null;
+    }
+
     private CameraDevice mCameraDevice;
     private CameraCharacteristics mCameraCharacteristics;
 
@@ -106,6 +111,7 @@ public class Camera_v2 {
                             mCameraID = id;
                             Log.d(TAG, "initCamera: mCameraID:"+mCameraID);
                             mCameraCharacteristics = characteristics;
+                            checkLevel(characteristics);
                             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                             if (map != null) {
                                 supportPreviewSize = map.getOutputSizes(SurfaceHolder.class);
@@ -117,6 +123,24 @@ public class Camera_v2 {
             }
         } catch (CameraAccessException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void checkLevel(CameraCharacteristics characteristics) {
+        switch (characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)){
+            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED:
+                Log.d(TAG, "checkLevel: LIMITED");
+                break;
+            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL:
+                Log.d(TAG, "checkLevel: FULL");
+                break;
+            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY:
+                Log.d(TAG, "checkLevel: LEGACY");
+                break;
+            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3:
+                Log.d(TAG, "checkLevel: 3");
+                break;
+
         }
     }
 
@@ -140,15 +164,19 @@ public class Camera_v2 {
             mCameraManager.openCamera(mCameraID,new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice cameraDevice) {
+                    Log.d(TAG, "onOpened");
                     mCameraDevice = cameraDevice;
+                    startPreview();
                 }
 
                 @Override
                 public void onDisconnected(@NonNull CameraDevice cameraDevice) {
+                    Log.d(TAG, "CameraDevice onDisconnected");
                 }
 
                 @Override
                 public void onError(@NonNull CameraDevice cameraDevice, int i) {
+
                     if (mCameraDevice != null){
                         mCameraDevice.close();
                         mCameraDevice = null;
