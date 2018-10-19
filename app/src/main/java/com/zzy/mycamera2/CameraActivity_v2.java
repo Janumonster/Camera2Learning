@@ -10,24 +10,36 @@ import android.os.Message;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.util.Size;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
+
+import com.zzy.mycamera2.MySurface.CameraCarryer;
+import com.zzy.mycamera2.MySurface.CameraCarryerSurfaceCallback;
+import com.zzy.mycamera2.MySurface.CarryerSufaceView;
+import com.zzy.mycamera2.MySurface.SetSurfaceSizeCallback;
+
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraActivity_v2 extends AppCompatActivity implements View.OnClickListener{
 
     private static final String TAG = "Camera_v2";
 
-    private SurfaceView surfaceView;
+    private CarryerSufaceView surfaceView;
     private SurfaceHolder surfaceHolder;
     private ImageView imageHolder;
-    private Button capture,back;
+    private Button capture,back,recorder,stop;
 
     private Camera_v2 camera_v2;
     private boolean isBack = false;
+
+    private Size mPreviewSize;
 
     @SuppressLint("HandlerLeak")
     private Handler handler = new Handler(){
@@ -70,6 +82,40 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         }
     };
 
+    private CameraCarryerSurfaceCallback surfaceCallback = new CameraCarryerSurfaceCallback() {
+        @Override
+        public void onSurfaceCreated(Surface surface, int width, int height) {
+            Log.d(TAG, "carryersurface Created width:"+width+"  height:"+height);
+            if (surfaceView.isSurfaceAvailable()) {
+                camera_v2.openCamera();
+            }
+        }
+
+        @Override
+        public void onSurfaceChanged(Surface surface, int width, int height) {
+            Log.d(TAG, "carryersuface Changed width:"+width+"  height:"+height);
+            ViewGroup.LayoutParams layoutParams = surfaceView.getLayoutParams();
+            int w = layoutParams.width;
+            int h = layoutParams.height;
+
+            if (w < h * width/height){
+                w = w;
+                h = w * height / width;
+            }else {
+                w = h * width / height;
+                h = h;
+            }
+            layoutParams.width = w;
+            layoutParams.height = h;
+            surfaceView.setLayoutParams(layoutParams);
+        }
+
+        @Override
+        public void onSurfaceDestroyed() {
+
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -84,14 +130,25 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         imageHolder = findViewById(R.id.image);
         capture = findViewById(R.id.take_picture);
         back = findViewById(R.id.back_preview);
+        recorder = findViewById(R.id.recorder);
+        stop = findViewById(R.id.stop_recorder);
+        stop.setOnClickListener(this);
+        recorder.setOnClickListener(this);
         capture.setOnClickListener(this);
         back.setOnClickListener(this);
 
-        surfaceHolder = surfaceView.getHolder();
-        surfaceHolder.setKeepScreenOn(true);
-        surfaceHolder.addCallback(callback);
+        surfaceView.setSurfaceCallbcak(surfaceCallback);
 
         camera_v2 = new Camera_v2(CameraActivity_v2.this);
+        mPreviewSize = camera_v2.getSupportPreviewSize()[3];
+        Log.d(TAG, "initView: PreviewSize:"+mPreviewSize.getWidth()+"*"+mPreviewSize.getHeight());
+        surfaceView.setPreviewSize(mPreviewSize.getWidth(), mPreviewSize.getHeight(), new SetSurfaceSizeCallback() {
+            @Override
+            public void setSurfaceSizeComplete() {
+
+            }
+        });
+        camera_v2.setmPreviewSurface(surfaceView.getSurface());
         camera_v2.setOnCaptureListener(new OnCaptureListener() {
             @Override
             public void onCaptured(byte[] bytes) {
@@ -101,7 +158,6 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
                 handler.sendMessage(message);
             }
         });
-        camera_v2.setmPreviewSurface(surfaceHolder.getSurface());
 
     }
 
@@ -117,6 +173,11 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
                 imageHolder.setVisibility(View.GONE);
 
                 isBack = false;
+                break;
+            case R.id.recorder:
+                break;
+            case R.id.stop_recorder:
+                camera_v2.startPreview();
                 break;
         }
     }

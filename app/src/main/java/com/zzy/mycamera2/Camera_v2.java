@@ -13,9 +13,12 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.CamcorderProfile;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
@@ -28,6 +31,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.WindowManager;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -95,7 +99,6 @@ public class Camera_v2 {
         this.mContext = mContext;
         initCamera();
     }
-
 
     private void initCamera() {
         startBackgroundThread();
@@ -195,7 +198,7 @@ public class Camera_v2 {
             return;
         }
         try {
-            mImageReader = ImageReader.newInstance(1280,960,ImageFormat.JPEG,2);
+            mImageReader = ImageReader.newInstance(1080,1440,ImageFormat.JPEG,2);
             mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
                 @Override
                 public void onImageAvailable(ImageReader imageReader) {
@@ -230,7 +233,6 @@ public class Camera_v2 {
 
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-
                 }
             }, mBackgroundHandler);
 
@@ -252,7 +254,20 @@ public class Camera_v2 {
                 e.printStackTrace();
             }
         }
+    }
 
+    public void reStartPreview(){
+        Log.d(TAG, "reStartPreview");
+        if (mCameraDevice == null){
+            return;
+        }
+        if (mCaptureSession != null){
+            try {
+                mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),null,mBackgroundHandler);
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void takePicture(){
@@ -280,6 +295,9 @@ public class Camera_v2 {
         }
     }
 
+    /**
+     * 释放相机
+     */
     public void closeCamera(){
         Log.d(TAG, "closeCamera");
         if (mCameraDevice != null){
