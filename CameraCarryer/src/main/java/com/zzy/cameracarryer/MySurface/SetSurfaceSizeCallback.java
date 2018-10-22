@@ -1,4 +1,4 @@
-package com.zzy.mycamera2.MySurface;
+package com.zzy.cameracarryer.MySurface;
 
 public interface SetSurfaceSizeCallback {
 

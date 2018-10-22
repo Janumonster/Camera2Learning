@@ -55,6 +55,9 @@ public class Camera_v2 {
     private String[] cameraIds;
     private String mCameraID;
 
+    private int mPreviewWidth;
+    private int mPreviewHeight;
+
     public Size[] getSupportPreviewSize() {
         return supportPreviewSize;
     }
@@ -118,6 +121,11 @@ public class Camera_v2 {
                             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                             if (map != null) {
                                 supportPreviewSize = map.getOutputSizes(SurfaceHolder.class);
+                                if (isFirstPreview){
+                                    isFirstPreview = false;
+                                    mPreviewWidth = supportPreviewSize[0].getWidth();
+                                    mPreviewHeight = supportPreviewSize[0].getHeight();
+                                }
                             }
                             break;
                         }
@@ -179,7 +187,7 @@ public class Camera_v2 {
 
                 @Override
                 public void onError(@NonNull CameraDevice cameraDevice, int i) {
-
+                    Log.d(TAG, "onError");
                     if (mCameraDevice != null){
                         mCameraDevice.close();
                         mCameraDevice = null;
@@ -198,7 +206,7 @@ public class Camera_v2 {
             return;
         }
         try {
-            mImageReader = ImageReader.newInstance(1080,1440,ImageFormat.JPEG,2);
+            mImageReader = ImageReader.newInstance(mPreviewWidth,mPreviewHeight,ImageFormat.JPEG,2);
             mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
                 @Override
                 public void onImageAvailable(ImageReader imageReader) {
@@ -306,4 +314,13 @@ public class Camera_v2 {
         }
     }
 
+    public void setPreviewSize(int width,int height){
+        mPreviewWidth = width;
+        mPreviewHeight = height;
+
+    }
+
+    public Size getPreviewSize(){
+        return new Size(mPreviewWidth,mPreviewHeight);
+    }
 }

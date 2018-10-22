@@ -14,17 +14,14 @@ import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 
-import com.zzy.mycamera2.MySurface.CameraCarryer;
-import com.zzy.mycamera2.MySurface.CameraCarryerSurfaceCallback;
-import com.zzy.mycamera2.MySurface.CarryerSufaceView;
-import com.zzy.mycamera2.MySurface.SetSurfaceSizeCallback;
+import com.zzy.cameracarryer.MySurface.CameraCarryerSurfaceCallback;
+import com.zzy.cameracarryer.MySurface.CarryerSufaceView;
+import com.zzy.cameracarryer.MySurface.SetSurfaceSizeCallback;
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraActivity_v2 extends AppCompatActivity implements View.OnClickListener{
@@ -34,12 +31,15 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
     private CarryerSufaceView surfaceView;
     private SurfaceHolder surfaceHolder;
     private ImageView imageHolder;
-    private Button capture,back,recorder,stop;
+    private Button capture,back,recorder,stop,size;
+    private Button btn_4_3,btn_1_1;
 
     private Camera_v2 camera_v2;
     private boolean isBack = false;
 
-    private Size mPreviewSize;
+    private Size previewSize;
+
+    private Size[] mPreviewSizes;
 
     @SuppressLint("HandlerLeak")
     private Handler handler = new Handler(){
@@ -61,27 +61,6 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         }
     };
 
-    private SurfaceHolder.Callback callback = new SurfaceHolder.Callback() {
-        @Override
-        public void surfaceCreated(SurfaceHolder surfaceHolder) {
-//            if (camera_v2.isCameraClosed()){
-//                camera_v2.openCamera();
-//            }
-            camera_v2.openCamera();
-            camera_v2.startPreview();
-        }
-
-        @Override
-        public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
-
-        }
-
-        @Override
-        public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
-
-        }
-    };
-
     private CameraCarryerSurfaceCallback surfaceCallback = new CameraCarryerSurfaceCallback() {
         @Override
         public void onSurfaceCreated(Surface surface, int width, int height) {
@@ -89,25 +68,13 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
             if (surfaceView.isSurfaceAvailable()) {
                 camera_v2.openCamera();
             }
+            previewSize = new Size(width,height);
         }
 
         @Override
         public void onSurfaceChanged(Surface surface, int width, int height) {
             Log.d(TAG, "carryersuface Changed width:"+width+"  height:"+height);
-            ViewGroup.LayoutParams layoutParams = surfaceView.getLayoutParams();
-            int w = layoutParams.width;
-            int h = layoutParams.height;
-
-            if (w < h * width/height){
-                w = w;
-                h = w * height / width;
-            }else {
-                w = h * width / height;
-                h = h;
-            }
-            layoutParams.width = w;
-            layoutParams.height = h;
-            surfaceView.setLayoutParams(layoutParams);
+            previewSize = new Size(width,height);
         }
 
         @Override
@@ -132,6 +99,12 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         back = findViewById(R.id.back_preview);
         recorder = findViewById(R.id.recorder);
         stop = findViewById(R.id.stop_recorder);
+        size = findViewById(R.id.preview_size);
+        btn_4_3 = findViewById(R.id.size_four_three);
+        btn_1_1 = findViewById(R.id.size_one_one);
+        btn_1_1.setOnClickListener(this);
+        btn_4_3.setOnClickListener(this);
+        size.setOnClickListener(this);
         stop.setOnClickListener(this);
         recorder.setOnClickListener(this);
         capture.setOnClickListener(this);
@@ -140,9 +113,11 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         surfaceView.setSurfaceCallbcak(surfaceCallback);
 
         camera_v2 = new Camera_v2(CameraActivity_v2.this);
-        mPreviewSize = camera_v2.getSupportPreviewSize()[3];
-        Log.d(TAG, "initView: PreviewSize:"+mPreviewSize.getWidth()+"*"+mPreviewSize.getHeight());
-        surfaceView.setPreviewSize(mPreviewSize.getWidth(), mPreviewSize.getHeight(), new SetSurfaceSizeCallback() {
+        mPreviewSizes = camera_v2.getSupportPreviewSize();
+        for (Size s : mPreviewSizes){
+            Log.d(TAG, "supportPreviewSize:"+s.getWidth()+"*"+s.getHeight());
+        }
+        surfaceView.setPreviewSize(camera_v2.getPreviewSize().getWidth(), camera_v2.getPreviewSize().getHeight(), new SetSurfaceSizeCallback() {
             @Override
             public void setSurfaceSizeComplete() {
 
@@ -171,14 +146,46 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
             case R.id.back_preview:
                 surfaceView.setVisibility(View.VISIBLE);
                 imageHolder.setVisibility(View.GONE);
-
                 isBack = false;
                 break;
             case R.id.recorder:
-                break;
-            case R.id.stop_recorder:
                 camera_v2.startPreview();
                 break;
+            case R.id.stop_recorder:
+                camera_v2.stopPreview();
+                break;
+            case R.id.preview_size:
+                camera_v2.stopPreview();
+                surfaceView.setPreviewSize(mPreviewSizes[1].getWidth(), mPreviewSizes[1].getHeight(), new SetSurfaceSizeCallback() {
+                    @Override
+                    public void setSurfaceSizeComplete() {
+                        Log.d(TAG, "setSurfaceSizeComplete: ");
+                        camera_v2.setPreviewSize(mPreviewSizes[1].getWidth(),mPreviewSizes[1].getHeight());
+                        camera_v2.startPreview();
+                    }
+                });
+
+                break;
+            case R.id.size_four_three:
+                camera_v2.stopPreview();
+                surfaceView.setPreviewSize(mPreviewSizes[0].getWidth(), mPreviewSizes[0].getHeight(), new SetSurfaceSizeCallback() {
+                    @Override
+                    public void setSurfaceSizeComplete() {
+                        camera_v2.setPreviewSize(mPreviewSizes[0].getWidth(),mPreviewSizes[0].getHeight());
+                    }
+                });
+                break;
+            case R.id.size_one_one:
+                camera_v2.stopPreview();
+                camera_v2.setPreviewSize(mPreviewSizes[1].getWidth(),mPreviewSizes[1].getHeight());
+                surfaceView.setPreviewSize(mPreviewSizes[1].getWidth(), mPreviewSizes[1].getHeight(), new SetSurfaceSizeCallback() {
+                    @Override
+                    public void setSurfaceSizeComplete() {
+                        camera_v2.startPreview();
+                    }
+                });
+                break;
+
         }
     }
 

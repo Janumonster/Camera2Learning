@@ -1,13 +1,18 @@
-package com.zzy.mycamera2.MySurface;
+package com.zzy.cameracarryer.MySurface;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Handler;
+import android.support.annotation.RequiresApi;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Size;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.ViewGroup;
 
 public class CarryerSufaceView extends SurfaceView implements CameraCarryer,SurfaceHolder.Callback{
 
@@ -15,6 +20,9 @@ public class CarryerSufaceView extends SurfaceView implements CameraCarryer,Surf
 
     private int mPreviewWidth = 0;
     private int mPreviewHeight = 0;
+
+    private int viewWidth = 0;
+    private int viewHeight = 0;
 
     private boolean isSurfaceAvailable;
     private SurfaceHolder mSurfaceHolder;
@@ -89,6 +97,7 @@ public class CarryerSufaceView extends SurfaceView implements CameraCarryer,Surf
         }else {
             mSurfaceCallback.onSurfaceChanged(surfaceHolder.getSurface(),width,height);
         }
+
     }
 
     @Override
@@ -132,31 +141,34 @@ public class CarryerSufaceView extends SurfaceView implements CameraCarryer,Surf
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (mPreviewWidth == 0 || mPreviewHeight == 0){
-            Log.d(TAG, "onMeasure PreviewSize is 0*0");
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        }else {
-            int width = MeasureSpec.getSize(widthMeasureSpec);
-            int hegiht = MeasureSpec.getSize(heightMeasureSpec);
-            int widthFixed,heightFixed;
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        viewWidth = MeasureSpec.getSize(widthMeasureSpec);
+        viewHeight = MeasureSpec.getSize(heightMeasureSpec);
+//        Log.d(TAG, "onMeasure: viewSize:"+viewWidth+"*"+viewHeight);
+        if (isFirsetCreated){
+            int orientation = getResources().getConfiguration().orientation;
+            if (orientation == Configuration.ORIENTATION_LANDSCAPE){
+                setPreviewSize(mPreviewWidth, mPreviewHeight, new SetSurfaceSizeCallback() {
+                    @Override
+                    public void setSurfaceSizeComplete() {
 
-            if (width < hegiht * mPreviewWidth/mPreviewHeight){
-                //根據view的高度和預覽比例算出的宽比较大，所以宽度不变，长度按比例缩小
-                widthFixed = width;
-                heightFixed = width * mPreviewHeight / mPreviewWidth;
+                    }
+                });
             }else {
-                //否则，反过来
-                widthFixed = hegiht * mPreviewWidth / mPreviewHeight;
-                heightFixed = hegiht;
+                setPreviewSize(mPreviewHeight, mPreviewWidth, new SetSurfaceSizeCallback() {
+                    @Override
+                    public void setSurfaceSizeComplete() {
+
+                    }
+                });
             }
-            Log.d(TAG, "width*height:"+width+"*"+hegiht+"   widthFixed*heightFixed:"+widthFixed+"*"+heightFixed);
-            setMeasuredDimension(widthFixed,heightFixed);
+
         }
     }
 
     @Override
     public void setPreviewSize(final int width, final int height, final SetSurfaceSizeCallback callback) {
-        if (width < 0 || height < 0 || callback == null){
+        if (width < 0 || height < 0||callback == null){
             throw new IllegalArgumentException("Size cannot be negative or call back is null");
         }
 
@@ -169,20 +181,43 @@ public class CarryerSufaceView extends SurfaceView implements CameraCarryer,Surf
             mPreviewHeight = width;
         }
 
-        Handler handler = new Handler(mContext.getMainLooper());
+        if (viewWidth != 0 && viewHeight != 0){
+            int h = viewHeight;
+            viewHeight = viewWidth*mPreviewHeight/mPreviewWidth;
+            ValueAnimator valueAnimator = ValueAnimator.ofInt(h,viewHeight);
+            valueAnimator.setDuration(300);
+            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                    int value = (int) valueAnimator.getAnimatedValue();
+                    ViewGroup.LayoutParams layoutParams = getLayoutParams();
+                    layoutParams.height = value;
+                    setLayoutParams(layoutParams);
+                }
+            });
+            Log.d(TAG, "setPreviewSize: form "+h+" to "+viewHeight);
+            valueAnimator.start();
+        }
+        Log.d(TAG, "setViewSize: "+viewWidth+"*"+viewHeight);
 
-        handler.post(new Runnable() {
+        new Thread(new Runnable() {
             @Override
             public void run() {
                 if (mSurfaceHolder != null){
-                    Log.d(TAG, "setPreviewSize:width"+width+"    height:"+height);
+                    //surface仍持有preview的真实尺寸，而surfaceview只体现比例相同。
+                    Log.d(TAG, "setPreviewSize:width:"+width+"    height:"+height);
                     mSurfaceHolder.setFixedSize(width,height);
                 }
+                requestLayout();
                 callback.setSurfaceSizeComplete();
             }
         });
+
     }
 
-
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    public Size getSurfaceViewSize(){
+        return new Size(viewWidth,viewHeight);
+    }
 
 }

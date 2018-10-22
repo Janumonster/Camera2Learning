@@ -6,11 +6,16 @@
     android:layout_height="match_parent"
     tools:context=".CameraActivity_v2">
 
-    <com.zzy.mycamera2.MySurface.CarryerSufaceView
+    <com.zzy.cameracarryer.MySurface.CarryerSufaceView
         android:id="@+id/preview_layout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-    </com.zzy.mycamera2.MySurface.CarryerSufaceView>
+        android:layout_height="match_parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintVertical_bias="0">
+    </com.zzy.cameracarryer.MySurface.CarryerSufaceView>
 
     <ImageView
         android:id="@+id/image"
@@ -24,8 +29,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/preview_layout"
-        app:layout_constraintVertical_bias="0.3"/>
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/take_picture"
@@ -62,10 +66,36 @@
         android:id="@+id/stop_recorder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
         android:text="stop"
         app:layout_constraintBottom_toTopOf="@+id/recorder"
         app:layout_constraintEnd_toEndOf="@+id/recorder"
         app:layout_constraintStart_toStartOf="@+id/recorder" />
+
+    <Button
+        android:id="@+id/preview_size"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:text="16:9"
+        app:layout_constraintBottom_toTopOf="@+id/take_picture"
+        app:layout_constraintEnd_toEndOf="@+id/take_picture"
+        app:layout_constraintStart_toStartOf="@+id/take_picture" />
+
+    <Button
+        android:id="@+id/size_four_three"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="4:3"
+        app:layout_constraintBottom_toTopOf="@+id/preview_size"
+        app:layout_constraintEnd_toEndOf="@+id/preview_size"
+        app:layout_constraintStart_toStartOf="@+id/preview_size" />
+
+    <Button
+        android:id="@+id/size_one_one"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1:1"
+        app:layout_constraintBottom_toTopOf="@+id/stop_recorder"
+        app:layout_constraintEnd_toEndOf="@+id/stop_recorder"
+        app:layout_constraintStart_toStartOf="@+id/stop_recorder" />
 
 </android.support.constraint.ConstraintLayout>
