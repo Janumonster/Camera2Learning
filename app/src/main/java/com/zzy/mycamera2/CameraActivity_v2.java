@@ -57,6 +57,9 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
                     Bitmap bitmap1 = Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),matrix,true);
                     imageHolder.setImageBitmap(bitmap1);
                     break;
+                case 1:
+                    camera_v2.startPreview();
+                    break;
             }
         }
     };
@@ -75,6 +78,10 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         public void onSurfaceChanged(Surface surface, int width, int height) {
             Log.d(TAG, "carryersuface Changed width:"+width+"  height:"+height);
             previewSize = new Size(width,height);
+            if (surfaceView.isSurfaceAvailable()){
+
+                camera_v2.startPreview();
+            }
         }
 
         @Override
@@ -111,18 +118,18 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
         back.setOnClickListener(this);
 
         surfaceView.setSurfaceCallbcak(surfaceCallback);
-
-        camera_v2 = new Camera_v2(CameraActivity_v2.this);
-        mPreviewSizes = camera_v2.getSupportPreviewSize();
-        for (Size s : mPreviewSizes){
-            Log.d(TAG, "supportPreviewSize:"+s.getWidth()+"*"+s.getHeight());
-        }
-        surfaceView.setPreviewSize(camera_v2.getPreviewSize().getWidth(), camera_v2.getPreviewSize().getHeight(), new SetSurfaceSizeCallback() {
+        surfaceView.setPreviewSize(1440, 1080, new SetSurfaceSizeCallback() {
             @Override
             public void setSurfaceSizeComplete() {
 
             }
         });
+        camera_v2 = new Camera_v2(CameraActivity_v2.this);
+        mPreviewSizes = camera_v2.getSupportPreviewSize();
+//        for (Size s : mPreviewSizes){
+//            Log.d(TAG, "supportPreviewSize:"+s.getWidth()+"*"+s.getHeight());
+//        }
+        camera_v2.setPreviewSize(mPreviewSizes[0].getWidth(),mPreviewSizes[0].getHeight());
         camera_v2.setmPreviewSurface(surfaceView.getSurface());
         camera_v2.setOnCaptureListener(new OnCaptureListener() {
             @Override
@@ -155,33 +162,30 @@ public class CameraActivity_v2 extends AppCompatActivity implements View.OnClick
                 camera_v2.stopPreview();
                 break;
             case R.id.preview_size:
-                camera_v2.stopPreview();
+
                 surfaceView.setPreviewSize(mPreviewSizes[1].getWidth(), mPreviewSizes[1].getHeight(), new SetSurfaceSizeCallback() {
                     @Override
                     public void setSurfaceSizeComplete() {
-                        Log.d(TAG, "setSurfaceSizeComplete: ");
-                        camera_v2.setPreviewSize(mPreviewSizes[1].getWidth(),mPreviewSizes[1].getHeight());
-                        camera_v2.startPreview();
+
                     }
                 });
 
                 break;
             case R.id.size_four_three:
-                camera_v2.stopPreview();
+
                 surfaceView.setPreviewSize(mPreviewSizes[0].getWidth(), mPreviewSizes[0].getHeight(), new SetSurfaceSizeCallback() {
                     @Override
                     public void setSurfaceSizeComplete() {
-                        camera_v2.setPreviewSize(mPreviewSizes[0].getWidth(),mPreviewSizes[0].getHeight());
+
                     }
                 });
                 break;
             case R.id.size_one_one:
-                camera_v2.stopPreview();
-                camera_v2.setPreviewSize(mPreviewSizes[1].getWidth(),mPreviewSizes[1].getHeight());
-                surfaceView.setPreviewSize(mPreviewSizes[1].getWidth(), mPreviewSizes[1].getHeight(), new SetSurfaceSizeCallback() {
+
+                surfaceView.setPreviewSize(mPreviewSizes[7].getWidth(), mPreviewSizes[7].getHeight(), new SetSurfaceSizeCallback() {
                     @Override
                     public void setSurfaceSizeComplete() {
-                        camera_v2.startPreview();
+
                     }
                 });
                 break;

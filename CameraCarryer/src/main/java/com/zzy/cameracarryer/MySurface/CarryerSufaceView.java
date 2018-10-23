@@ -141,35 +141,33 @@ public class CarryerSufaceView extends SurfaceView implements CameraCarryer,Surf
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        viewWidth = MeasureSpec.getSize(widthMeasureSpec);
-        viewHeight = MeasureSpec.getSize(heightMeasureSpec);
-//        Log.d(TAG, "onMeasure: viewSize:"+viewWidth+"*"+viewHeight);
-        if (isFirsetCreated){
-            int orientation = getResources().getConfiguration().orientation;
-            if (orientation == Configuration.ORIENTATION_LANDSCAPE){
-                setPreviewSize(mPreviewWidth, mPreviewHeight, new SetSurfaceSizeCallback() {
-                    @Override
-                    public void setSurfaceSizeComplete() {
 
-                    }
-                });
-            }else {
-                setPreviewSize(mPreviewHeight, mPreviewWidth, new SetSurfaceSizeCallback() {
-                    @Override
-                    public void setSurfaceSizeComplete() {
+        if (mPreviewWidth == 0 ||mPreviewHeight == 0){
+            Log.d(TAG, "onMeasure: mPrevirewSize is 0*0");
+            super.onMeasure(widthMeasureSpec,heightMeasureSpec);
+        }else {
+            viewWidth = MeasureSpec.getSize(widthMeasureSpec);
+            viewHeight = MeasureSpec.getSize(heightMeasureSpec);
 
-                    }
-                });
+            int widthFixed = viewWidth;
+            int heightFixed = viewWidth*mPreviewHeight/mPreviewWidth;
+
+            if (isFirsetCreated){
+                ViewGroup.LayoutParams layoutParams = getLayoutParams();
+                layoutParams.height = heightFixed;
+                setLayoutParams(layoutParams);
             }
 
+
+            Log.d(TAG, "onMeasure: FixedSize:"+widthFixed+"*"+heightFixed);
+            setMeasuredDimension(widthFixed,heightFixed);
         }
     }
 
     @Override
     public void setPreviewSize(final int width, final int height, final SetSurfaceSizeCallback callback) {
-        if (width < 0 || height < 0||callback == null){
-            throw new IllegalArgumentException("Size cannot be negative or call back is null");
+        if (width < 0 || height < 0){
+            throw new IllegalArgumentException("Size cannot be negative");
         }
 
         int orientation = getResources().getConfiguration().orientation;
@@ -181,43 +179,23 @@ public class CarryerSufaceView extends SurfaceView implements CameraCarryer,Surf
             mPreviewHeight = width;
         }
 
-        if (viewWidth != 0 && viewHeight != 0){
-            int h = viewHeight;
-            viewHeight = viewWidth*mPreviewHeight/mPreviewWidth;
-            ValueAnimator valueAnimator = ValueAnimator.ofInt(h,viewHeight);
-            valueAnimator.setDuration(300);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator valueAnimator) {
-                    int value = (int) valueAnimator.getAnimatedValue();
-                    ViewGroup.LayoutParams layoutParams = getLayoutParams();
-                    layoutParams.height = value;
-                    setLayoutParams(layoutParams);
-                }
-            });
-            Log.d(TAG, "setPreviewSize: form "+h+" to "+viewHeight);
-            valueAnimator.start();
+        int widthFixed = viewWidth;
+        int heightFixed = viewWidth*mPreviewHeight/mPreviewWidth;
+
+        ViewGroup.LayoutParams layoutParams = getLayoutParams();
+        layoutParams.height = heightFixed;
+        setLayoutParams(layoutParams);
+
+        Log.d(TAG, "setPreviewSize: "+viewWidth+"*"+heightFixed);
+        if (mSurfaceHolder != null) {
+            //surface仍持有preview的真实尺寸，而surfaceview只体现比例相同。
+            Log.d(TAG, "setPreviewSize:width:" + width + "    height:" + height);
+            mSurfaceHolder.setFixedSize(width, height);
         }
-        Log.d(TAG, "setViewSize: "+viewWidth+"*"+viewHeight);
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (mSurfaceHolder != null){
-                    //surface仍持有preview的真实尺寸，而surfaceview只体现比例相同。
-                    Log.d(TAG, "setPreviewSize:width:"+width+"    height:"+height);
-                    mSurfaceHolder.setFixedSize(width,height);
-                }
-                requestLayout();
-                callback.setSurfaceSizeComplete();
-            }
-        });
-
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public Size getSurfaceViewSize(){
-        return new Size(viewWidth,viewHeight);
+        requestLayout();
+        if (callback != null){
+            callback.setSurfaceSizeComplete();
+        }
     }
 
 }
